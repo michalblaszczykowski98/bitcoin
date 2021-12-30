@@ -1,0 +1,340 @@
+---
+title: "Building investment portfolio with Bitcoin"
+author: "Michał Błaszczykowski"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Improving the performance of an investment fund
+
+These days, we have a situation where money are losing their value very fast and prices for goods or services are bigger and bigger. Due to this, keeping savings on bank deposits or simply in cash isn't profitable. Most people agree that it is a perfect time for investing and finding new solutions to protect possessions. There are a lot of possibilities, we can invest in properties, raw materials or just on the stock exchange. There are appearing also new modern assets like cryptocurrencies which encourage more and more people to invest. Even big companies and institutions are interested in adding them to their investment fund. In this report, I will compare the most known cryptocurrency **Bitcoin** with the stock index **S&P 500** and **gold**. I will focus on the differences between the variability and profitability of those assets during last years. The main aim of this project is to find the best hedge versus still increasing inflation.
+
+### Loading the datasets and necessary libraries
+
+```{r, message = FALSE}
+library(tidyverse)
+library(readr)
+library(ggplot2)
+library(ggcorrplot)
+bitcoin_data <- read.csv('bitcoin-usd.csv')
+sp500_data <- read.csv('sp500.csv')
+gold_data <- read.csv('monthly_data.csv')
+```
+
+### Cleaning and preparing data for analyzing
+
+**In the beginning, I start with checking the number of missing values in all used datasets.**
+
+```{r, message = FALSE}
+sum(is.na(bitcoin_data))
+sum(is.na(sp500_data))
+sum(is.na(gold_data))
+bitcoin_data[!complete.cases(bitcoin_data),]
+```
+There aren't missing values in `sp500_data` and `gold_data`, but there are `20` missing values in `bitcoin_data.` We have `4` rows where all numeric variables are empty. However, it is a very small proportion of our set of data, so we remove those rows instead of using imputation. 
+
+```{r, message = FALSE}
+bitcoin_data <- na.omit(bitcoin_data)
+```
+
+There is also another significant problem because our datasets contain quotes of assets with different frequencies. Owing to, we are interested in carrying out research related to the long-term risk of our portfolio and its profitability we will focus on average monthly prices (average monthly volume too). 
+
+## Analyses associated with building proportions of our portfolio
+
+**I will make one specific dataset with average monthly prices and average monthly volumes of all assets.** 
+
+```{r, message=FALSE}
+#Operations for Bitcoin
+bitcoin_data$date <- as.Date(bitcoin_data$date)
+BTC <- bitcoin_data %>% 
+                mutate(Month = lubridate::month(date),
+                       Year = lubridate::year(date))
+BTC_mean_month_price <- aggregate(close~Month+Year, BTC, mean)
+BTC_mean_month_volume <- aggregate(volume~Month+Year, BTC, mean)[3]
+
+#Operations for S&P500
+sp500_data$date <- as.Date(sp500_data$date)
+Sp500 <- sp500_data %>% 
+                mutate(Month = lubridate::month(date),
+                       Year = lubridate::year(date))
+Sp500_mean_month_price <- aggregate(close~Month+Year, Sp500, mean)[3]
+Sp500_mean_month_volume <- aggregate(volume~Month+Year, Sp500, mean)[3]
+
+
+data_assets <- data.frame(BTC_mean_month_price, BTC_mean_month_volume, Sp500_mean_month_price,
+                          Sp500_mean_month_volume, gold_data$gold_usd, gold_data$cpi_us)
+names(data_assets) <- c("Month", "Year", "Price_BTC", "Volume_BTC", "Price_Sp500", "Volume_Sp500", 
+                        "Price_Gold", "Inflation_points")
+ 
+data_assets$Month <- factor(data_assets$Month)
+data_assets$Year <- factor(data_assets$Year)
+```
+
+**Finally, I show some rows from the attained dataset.**
+
+```{r, message = FALSE}
+head(data_assets)
+```
+
+**Below there is a simple summary of the dataset with basic statistics.**
+
+```{r, message = FALSE}
+summary(data_assets[-c(1,2)])
+```
+
+Values of volumes are much bigger than values representing prices of assets. **Comparing `Min` and `Max` of prices, it is easy to see that Bitcoin characterizes the most variability.**
+
+**Now, I display charts of all assets during the period of time which is used in the research.** 
+
+```{r, message = FALSE}
+bitcoin_data %>% 
+  ggplot(aes(x = date, y = close))+
+  geom_line(color = "orange")+
+  xlab("Date")+
+  ylab("Price_BTC")+
+  ggtitle("Chart of Bitcoin price")
+```
+
+```{r, message = FALSE}
+sp500_data %>% 
+  ggplot(aes(x = date, y = close))+
+  geom_line(color = "purple")+
+  xlab("Date")+
+  ylab("Price_S&P_500")+
+  ggtitle("Chart of S&P 500 price")
+
+```
+
+```{r, message = FALSE}
+gold_data %>% 
+  ggplot(aes(x = as.Date(date), y = gold_usd))+
+  geom_line(color = "yellow")+
+  xlab("Date")+
+  ylab("Gold_price")+
+  ggtitle("Chart of gold price")
+```
+
+**I present chart of inflation too.**
+
+```{r, message = FALSE}
+gold_data %>% 
+  ggplot(aes(x = as.Date(date), y = cpi_us))+
+  geom_line(color = "red")+
+  xlab("Date")+
+  ylab("Gold_price")+
+  ggtitle("Chart of inflation")
+```
+
+**To sum up, during a presented period of time we have a very fast increase in the level of inflation. We see also amazing growth in the prices of assets which are staying more and more expensive.**
+
+**To be honest, there isn't one still rule between the behavior of assets prices and inflation.** In the past, there were some periods of time when increasing inflation had a positive impact on stock prices or raw materials prices. But, there were also moments when this relationship was completely opposite. It seems strange and illogical, but **investing is based on economics which is a social science**. It means that we don't have certain solutions and laws which ensure us something. We can only analyze the possibility of some situations.
+
+**It is also worth saying that inflation is one of many factors which have an influence on prices, so it is impossible to predict the future situation on markets only based on it.**
+
+**We check the relationships between all researched assets and inflation. To do it we draw a correlation matrix.**
+
+```{r, message = FALSE}
+r <- cor(data_assets[c(3,5,7,8)],)
+p <- cor_pmat(data_assets[c(3,5,7,8)],)
+ggcorrplot(r, lab = T, p.mat = p)
+```
+
+**Correlations are very clear and have values near 1. All are also statistically significant. The values of correlations mean that there are big relationships between our variables. The increase of one variable brings the increase of the second variable. All things considered, in the last period of time increasing inflation had a positive impact on all assets.**
+
+**Now, I will focus only on comparing our used assets - their variability and profitability.**
+
+I will make a table with the `variance`, `standard deviation` and `variation coefficient` of all three assets.
+
+```{r, message=FALSE}
+w1 <- sd(data_assets$Price_BTC)/mean(data_assets$Price_BTC)
+w2 <- sd(data_assets$Price_Sp500)/mean(data_assets$Price_Sp500)
+w3 <- sd(data_assets$Price_Gold)/mean(data_assets$Price_Gold)
+
+tab <- matrix(c(w1,w2,w3,
+          var(data_assets$Price_BTC),
+          var(data_assets$Price_Sp500),
+          var(data_assets$Price_Gold),
+          sd(data_assets$Price_BTC),
+          sd(data_assets$Price_Sp500),
+          sd(data_assets$Price_Gold)), ncol = 3, byrow = TRUE)
+
+colnames(tab) <- c("Bitcoin","Sp500","Gold")
+rownames(tab) <- c("Variation_coefficient","Variance","Standard_deviation")
+
+table_assets <- as.table(tab)
+table_assets
+```
+
+We can read that **Bitcoin** is the most variability asset, in the second place there is an index **S&P 500** and on the third position is situated **Gold**. The difference between the results of the index **S&P 500** and **Gold** isn't significant. However, the values of the Bitcoin coefficients are much bigger.
+
+**The most important for us is `Variation_coefficient` because it is a relative measurement of variability**.
+
+```{r, message=FALSE}
+cat("Bitcoin - Variation_coefficient:", table_assets[1,1])
+
+cat("S&P 500 - Variation_coefficient:", table_assets[1,2])
+
+cat("Gold - Variation_coefficient:", table_assets[1,3])
+```
+
+This coefficient tells us that Bitcoin characterizes approximately `6` times bigger variability than **S&P 500** and about 8 times bigger than **Gold**.
+
+The variability of **S&P 500** was about `1.4` times bigger than the variability of **Gold**.
+
+**Now, I will check how the price of all assets is changing on average monthly.**
+
+```{r}
+function_month_change <- function(m)
+{
+vector <- c()
+
+for(i in 1:(length(data_assets[[m]])-1))
+{
+  vector[i] <- abs(data_assets[[m]][i]-data_assets[[m]][i+1])/data_assets[[m]][i]
+}
+
+vector <- round(vector, 2)*100
+return(vector)
+}
+
+print(percentage_of_change_BTC_average <- round(mean(function_month_change(3))),2)
+print(percentage_of_change_SP500_average <- round(mean(function_month_change(5))),2)
+print(percentage_of_change_GOLD_average <- round(mean(function_month_change(7))),2)
+```
+
+**The monthly price of Bitcoin has been changing about `16%` on average. In `S&P 500` and `Gold` we have nearly the same results and approximately the price has been changing monthly 3%. Below there is a chart that presented our results.**
+
+```{r, message = FALSE}
+asset_names <- c("Bitcoin","Sp500","Gold")
+values <- c(16,3,3)
+data_frame_1 <- data.frame(asset_names,values)
+names(data_frame_1) <- c("Asset","Value")
+data_frame_1 %>% 
+  ggplot(aes(x = Asset, y = Value))+
+  geom_col(fill = c("orange","purple","yellow"))+
+  ggtitle("Average change of price monthly (percentage)")
+```
+
+**Finally, I will check how the yearly variability of prices looked like on average during the period of time in research for all assets.**
+
+```{r, message = FALSE}
+print(year_average_price_BTC <- aggregate(data_assets$Price_BTC~data_assets$Year, FUN=mean))
+print(year_average_price_Sp500 <- aggregate(data_assets$Price_Sp500~data_assets$Year, FUN=mean))
+print(year_average_price_Gold <- aggregate(data_assets$Price_Gold~data_assets$Year, FUN=mean))
+```
+
+**Finally, I will check how the yearly variability of price looked like on average during the period of time in research.**
+
+```{r, message = FALSE}
+year_BTC_average_prices <- year_average_price_BTC$`data_assets$Price_BTC`
+year_Sp500_average_prices <- year_average_price_Sp500$`data_assets$Price_Sp500`
+year_gold_average_prices <- year_average_price_Gold$`data_assets$Price_Gold`
+list_year <- list(year_BTC_average_prices, year_Sp500_average_prices, year_gold_average_prices)
+
+function_year <- function(m)
+{  
+vector_2 <- c()
+mean_year <- c()
+
+for(i in 1:(length(list_year[[m]])-1))
+{
+  vector_2[i] <- abs(list_year[[m]][i]-list_year[[m]][i+1])/list_year[[m]][i]
+  mean_year <- round(mean(vector_2*100),)
+}
+return(mean_year)
+}
+
+print(yearly_price_change_BTC_average <- function_year(1))
+print(yearly_price_change_Sp500_average <- function_year(2))
+print(yearly_price_change_Gold_average <- function_year(3))
+```
+
+**The price of `Bitcoin` has been changing on average in the presented period of time about 173% yearly. It is an incredible result. For index `S&P 500` and `Gold` there is a change of price on average is 12% and `8%` yearly.**
+
+```{r, message = FALSE}
+values_2 <- c(173,12,8)
+data_frame_2 <- data.frame(asset_names,values_2)
+names(data_frame_2) <- c("Asset","Value")
+data_frame_2 %>% 
+  ggplot(aes(x = Asset, y = Value))+
+  geom_col(fill = c("orange","purple","yellow"))+
+  ggtitle("Average change of price yearly (percentage)")
+```
+
+**We can summarise that Bitcoin is the most changing asset in our research. The differences between the variability of Bitcoin and the variability of other assets are huge. The index S&P 500 has been characterized by a little higher variability than Gold. The market of cryptocurrencies is very young yet and must wait for stabilization.**
+
+**We can see that the beginning of the Covid pandemic didn't have a negative impact on the price of `Gold`, but for `Bitcoin` and `S&P 500` there were sharp decreases. It is a very important insight because we don't know how the situation related to the Covid pandemic will look like in the future exactly. It will be allowed for in the proportions of a portfolio for sure.**
+
+## Important conclusions for all assets  
+
+**The first thing which is worth saying is that the capitalization of Bitcoin is about `40%-45%` capitalization of the cryptocurrency market.** If one asset has such a dominance it usually means that the market is unpredictable and floating. However, the situation is changing and also other cryptocurrencies increase their importance. **Thanks to that we can expect less variability for the cryptocurrency market in the future.**
+
+**Second thing is that price of Bitcoin depends on the relation between supply and demand mainly.** Bitcoin doesn't base on institutions or banks, it is an independent and international asset. Thanks to interest among people, Bitcoin still has value. 
+
+**`Gold` has a better position because it is a necessary raw material that is used in the industry.** We are sure that there will be a demand for gold in the future due to, development of our world and more and more production. The amount of this raw material is limited what gives us a high probability of profits from investing in the long term. **It also means that we can’t expect a huge rate of return, but it is quite a safe solution for investing.**
+
+**The index `S&P 500` represents 500 companies with the biggest capitalization from the USA. Each company deals with the production of goods or gives some services.** We can buy stocks that represent those companies and give them additional capital. The prices of stocks depend on the general financial situation of companies that represent them mainly. The firms making the index `S&P 500` are rather stable and still increasing their results, but there are also possible temporary fluctuations of prices and some losses.** However, in the long term as we look at history, investing in stocks was profitable.**
+
+**When we compare all assets and their operational rules, we can say that `Bitcoin` is the most variable, next we have the index `S&P 500` and at the end `Gold`.**
+
+Now, I will present the chart of `volume` for `Bitcoin` and `the index S&P 500` during last years.  
+
+```{r, message = FALSE}
+data_assets %>% 
+  ggplot(aes(x = Year, y = Volume_BTC, fill = Year))+
+  geom_boxplot()+
+  xlab("Date")+
+  ylab("Volume_BTC")+
+  ggtitle("Chart of Volume of Bitcoin")
+```
+
+**We can say that interest in Bitcoin has been increasing exponentially during the last few years. It is a good signal for Bitcoin's price and its general future because of its limited supply. There will be 21 million Bitcoin in use. People will have mined about 99% of Bitcoins by 2030. I think that it should encourage investors to have Bitcoins in portfolios.** 
+
+```{r, message = FALSE}
+data_assets %>% 
+  ggplot(aes(x = Year, y = Volume_Sp500, fill = Year))+
+  geom_boxplot()+
+  xlab("Date")+
+  ylab("Volume_Sp500")+
+  ggtitle("Chart of Volume of S&P 500")
+```
+
+**The value of the volume of the `index S&P 500` isn't as variable as the value of `Bitcoin` volume. Nevertheless, during the last two years, we can see some increases.**
+
+## Profitability and final proportions of portfolio
+
+**I will check the profitability of our assets based on the available data.**
+
+```{r}
+vector_start <- c(data_assets$Price_BTC[1], data_assets$Price_Sp500[1], data_assets$Price_Gold[1])
+vector_end <- c(data_assets$Price_BTC[87], data_assets$Price_Sp500[87], data_assets$Price_Gold[87])
+vector_profitability <- (abs(vector_start-vector_end)/vector_start)*100
+vector_profitability
+```
+
+**We have the following rates of return during the last 7 years:**
+
+* **Bitcoin - 15462%** 
+
+* **S&P 500 - 135%** 
+
+* **Gold - 44%** 
+
+**Bitcoin is the most variable asset and also the most profitable. The index S&P 500 has second place looking at the variability and profitability. Gold is making the lowest profit, but is the most stable asset.**
+
+**After all analyses related to variability and profitability, I decided to set the following proportions of assets in the portfolio.**
+
+```{r, message = FALSE}
+assets_names <- c("Bitcoin - 20%","35% - S&P 500","Gold - 45%")
+proportions_assets <- c(0.2,0.35,0.45)
+pie(proportions_assets, labels = assets_names, col = c("orange","purple","yellow"),
+    main = "Proportions of assets in portfolio")
+```
+
+**To sum up, I am convinced that adding Bitcoin to the portfolio is a very good idea. Bitcoin is a new technology that is still developing and gaining popularity. It is an independent means of payment, so it can turn out a true hedge versus still increasing inflation. I think that investors should get interested more in this asset and after making their own analyzes allocate some money to invest in Bitcoin!**  
+
+
+
